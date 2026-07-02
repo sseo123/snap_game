@@ -4,6 +4,8 @@ import { CardContent, Card, ToggleButton } from "@mui/material";
 import { ToggleButtonGroup, TextField } from "@mui/material";
 import * as React from "react";
 import StockCard from "./StockCard";
+import InitialPage from "./InitialPage";
+import GameOverPage from "./GameOverPage";
 
 const funds = [
   { code: "125497", name: "HDFC 100", risk: "HIGH" },
@@ -15,30 +17,38 @@ const funds = [
 ];
 
 const dates = [
-  { name: " 2013", start: "2013-01-01", end: "2013-06-30" },
-  { name: " 2016", start: "2016-01-01", end: "2016-06-30" },
-  { name: " 2018", start: "2018-01-01", end: "2018-06-30" },
-  { name: " 2020", start: "2020-03-01", end: "2020-09-01" },
-  { name: " 2021 ", start: "2021-01-01", end: "2021-06-30" },
+  { start: "2023-01-01", end: "2023-01-28" },
+  { start: "2023-01-28", end: "2023-03-28" },
+  { start: "2023-03-28", end: "2023-05-26" },
+  { start: "2023-05-26", end: "2023-06-28" },
+  { start: "2023-06-28", end: "2023-08-28" },
 ];
 
 function App() {
-  const [started, setStarted] = useState(false);
-  const [stocks, setStocks] = useState([]);
-  const [amount, setAmount] = useState({});
-  const [buyOrSellMap, setBuyOrSellMap] = useState({});
-  const [portfolio, setPortfolio] = useState({ cash: 100000, holdings: {} });
+  const [started, setStarted] = useState(false); // starting page or not
+  const [gameOver, setGameOver] = useState(false); // game over or not
 
+  const [stocks, setStocks] = useState([]); // array of fund objects (each has intial/eventual prices)
+  const [amount, setAmount] = useState({}); // how much money the player has typed to invest EX: { "125497": "5000", "119565": "1000" }
+  const [buyOrSellMap, setBuyOrSellMap] = useState({}); // buy or sell, and amount
+  const [portfolio, setPortfolio] = useState({ cash: 100000, holdings: {} }); // how much do they have, how much did they invest
+
+  const [dateIndex, setDateIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  // updates the funds entry in amount and spreads prev so other ofunds aren't lost
+  // then id of stock and amount they have is key:value
   const handleAmountChange = (code, value) => {
     setAmount((prev) => ({ ...prev, [code]: value }));
   };
 
+  // same thing but for the buy sell toggle
   const handleBuyOrSellChange = (code, value) => {
     setBuyOrSellMap((prev) => ({ ...prev, [code]: value }));
   };
 
   const handleNext = () => {
-    let newPortfolio = { ...portfolio, holdings: { ...portfolio.holdings } };
+    let newPortfolio = { ...portfolio, holdings: { ...portfolio.holdings } }; // make a copy so I don't change the old portfolio values
 
     stocks.forEach((stock) => {
       const investAmount = parseFloat(amount[stock.code]);
@@ -68,16 +78,24 @@ function App() {
         }
       }
     });
+
     setPortfolio(newPortfolio);
-    setAmount({}); // reset all input fields for next round
+    setAmount({});
+
+    // advance to the next period, or end the game
+    if (dateIndex < dates.length - 1) {
+      setDateIndex(dateIndex + 1);
+    } else {
+      setGameOver(true);
+    }
   };
 
-  // api call
-  useEffect(() => {
-    Promise.all(
+  // api call to get stocks
+  const fetchStocks = (start, end) => {
+    return Promise.all(
       funds.map((fund) =>
         fetch(
-          `https://api.mfapi.in/mf/${fund.code}?startDate=2023-01-02&endDate=2023-06-01`,
+          `https://api.mfapi.in/mf/${fund.code}?startDate=${start}&endDate=${end}`,
         )
           .then((res) => {
             if (!res.ok) throw new Error(`Error fetching ${fund.code}`);
@@ -88,16 +106,27 @@ function App() {
             const start_price = priceData[priceData.length - 1].nav;
             const end_price = priceData[0].nav;
             console.log(start_price, end_price);
-
+            setLoading(false);
             return { ...fund, initial: start_price, eventual: end_price };
           }),
       ),
-    )
+    );
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    const { start, end } = dates[dateIndex];
+    fetchStocks(start, end)
       .then((results) => setStocks(results))
       .catch((error) => console.error(error));
-  }, []);
+  }, [dateIndex]);
 
-  if (started) {
+  // starting/inital page
+
+  //ending page
+  if (gameOver) {
+    return <GameOverPage portfolio={portfolio} />;
+  } else if (started) {
     // when the game starts page
     return (
       <>
@@ -123,9 +152,16 @@ function App() {
             </Box>{" "}
             Game
           </Typography>
+          <Typography align="center" variant="h5">
+            Cash: ${portfolio.cash.toFixed(2)}
+          </Typography>
 
-          <Grid container spacing={2} justifyContent="center">
-            {stocks.map((stock) => (
+          <Typography align="center" variant="h5">
+            Net Worth: ${portfolio.cash.toFixed(2)}
+          </Typography>
+
+          <Grid container spacing={2}>
+            {(loading ? funds : stocks).map((stock) => (
               <StockCard
                 key={stock.code}
                 stock={stock}
@@ -133,6 +169,7 @@ function App() {
                 buyOrSell={buyOrSellMap[stock.code] || "Buy"}
                 onAmountChange={handleAmountChange}
                 onBuyOrSellChange={handleBuyOrSellChange}
+                uLoading={loading}
               />
             ))}
           </Grid>
@@ -141,48 +178,13 @@ function App() {
             <Button sx={{ m: 1 }} onClick={handleNext}>
               Next
             </Button>
-            <Typography>Cash: ${portfolio.cash.toFixed(2)}</Typography>
           </Box>
         </Container>
       </>
     );
+  } else {
+    return <InitialPage onStart={() => setStarted(true)} />;
   }
-  // starting/inital page
-  return (
-    <>
-      <Container maxWidth="lg">
-        <Typography
-          variant="h2"
-          align="center"
-          color="text.primary"
-          sx={{ py: 2 }}
-        >
-          Stock Market Simulator
-        </Typography>
-        <Typography
-          variant="h5"
-          align="center"
-          color="text.secondary"
-          sx={{ mx: 10 }}
-        >
-          Test out your
-          <Box component="span" sx={{ color: "success.main" }}>
-            {" "}
-            investing
-          </Box>{" "}
-          skills
-        </Typography>
-
-        <Box align="center">
-          <Button sx={{ m: 1 }} onClick={() => setStarted(true)}>
-            Get Started
-          </Button>
-        </Box>
-      </Container>
-    </>
-  );
 }
 
 export default App;
-
-const historical_snapshots = [];

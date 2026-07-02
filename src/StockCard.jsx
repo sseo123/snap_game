@@ -14,6 +14,7 @@ function StockCard({
   buyOrSell,
   onAmountChange,
   onBuyOrSellChange,
+  uLoading,
 }) {
   return (
     <Card sx={{ maxWidth: 350, m: 1 }}>
@@ -22,13 +23,13 @@ function StockCard({
           {stock.name} ({stock.risk})
         </Typography>
 
-        {stock.eventual ? (
+        {!uLoading ? (
           <Typography gutterBottom variant="h6" component="div">
             Current price: ${stock.eventual}
           </Typography>
         ) : (
           <Typography gutterBottom variant="h6" component="div">
-            Loading...
+            Current price: $ Loading...
           </Typography>
         )}
       </CardContent>
