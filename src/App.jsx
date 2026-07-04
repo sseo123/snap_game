@@ -25,35 +25,35 @@ const dates = [
 ];
 
 function App() {
-  const [started, setStarted] = useState(false); // starting page or not
-  const [gameOver, setGameOver] = useState(false); // game over or not
+  const [started, setStarted] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
 
-  const [stocks, setStocks] = useState([]); // array of fund objects (each has intial/eventual prices)
-  const [amount, setAmount] = useState({}); // how much money the player has typed to invest EX: { "125497": "5000", "119565": "1000" }
-  const [buyOrSellMap, setBuyOrSellMap] = useState({}); // buy or sell, and amount
-  const [portfolio, setPortfolio] = useState({ cash: 100000, holdings: {} }); // how much do they have, how much did they invest
+  const [stocks, setStocks] = useState([]);
+  const [amount, setAmount] = useState({});
+  const [buyOrSellMap, setBuyOrSellMap] = useState({});
+  const [portfolio, setPortfolio] = useState({ cash: 100000, holdings: {} });
 
   const [dateIndex, setDateIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [shareAmount, setShareAmount] = useState(0);
 
-  // updates the funds entry in amount and spreads prev so other ofunds aren't lost
-  // then id of stock and amount they have is key:value
   const handleAmountChange = (code, value) => {
     setAmount((prev) => ({ ...prev, [code]: value }));
   };
 
-  // same thing but for the buy sell toggle
   const handleBuyOrSellChange = (code, value) => {
     setBuyOrSellMap((prev) => ({ ...prev, [code]: value }));
   };
 
-  const handleNext = () => {
-    let newPortfolio = { ...portfolio, holdings: { ...portfolio.holdings } }; // make a copy so I don't change the old portfolio values
+  const handleReveal = () => {
+    setRevealed(true);
+    let newPortfolio = { ...portfolio, holdings: { ...portfolio.holdings } };
 
     stocks.forEach((stock) => {
       const investAmount = parseFloat(amount[stock.code]);
       const action = buyOrSellMap[stock.code] || "Buy";
-      const price = parseFloat(stock.eventual);
+      const price = parseFloat(stock.initial);
 
       if (!investAmount || investAmount <= 0) {
         return;
@@ -81,13 +81,16 @@ function App() {
 
     setPortfolio(newPortfolio);
     setAmount({});
+  };
 
-    // advance to the next period, or end the game
+  const handleNext = () => {
     if (dateIndex < dates.length - 1) {
       setDateIndex(dateIndex + 1);
     } else {
       setGameOver(true);
     }
+
+    setRevealed(false);
   };
 
   // api call to get stocks
@@ -121,11 +124,23 @@ function App() {
       .catch((error) => console.error(error));
   }, [dateIndex]);
 
-  // starting/inital page
+  const calculateNetWorth = () => {
+    let sum = 0;
 
-  //ending page
+    for (let i = 0; i < stocks.length; i++) {
+      let sharesOwned = portfolio.holdings[stocks[i].code] || 0;
+      let currentPrice = revealed
+        ? parseFloat(stocks[i].eventual) || 0
+        : parseFloat(stocks[i].initial) || 0;
+      sum += sharesOwned * currentPrice;
+    }
+
+    return portfolio.cash + sum;
+  };
+
   if (gameOver) {
-    return <GameOverPage portfolio={portfolio} />;
+    const finalNetWorth = calculateNetWorth();
+    return <GameOverPage finalNetWorth={finalNetWorth} />;
   } else if (started) {
     // when the game starts page
     return (
@@ -153,11 +168,21 @@ function App() {
             Game
           </Typography>
           <Typography align="center" variant="h5">
-            Cash: ${portfolio.cash.toFixed(2)}
+            Cash: $
+            {portfolio.cash.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </Typography>
 
           <Typography align="center" variant="h5">
-            Net Worth: ${portfolio.cash.toFixed(2)}
+            Net Worth: $
+            {!loading
+              ? calculateNetWorth().toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+              : "Calculating . . ."}
           </Typography>
 
           <Grid container spacing={2}>
@@ -170,14 +195,22 @@ function App() {
                 onAmountChange={handleAmountChange}
                 onBuyOrSellChange={handleBuyOrSellChange}
                 uLoading={loading}
+                revealed={revealed}
+                sharesOwned={portfolio.holdings[stock.code]}
               />
             ))}
           </Grid>
 
           <Box align="center">
-            <Button sx={{ m: 1 }} onClick={handleNext}>
-              Next
-            </Button>
+            {!revealed ? (
+              <Button sx={{ m: 1 }} onClick={handleReveal}>
+                Submit Stock Selection
+              </Button>
+            ) : (
+              <Button sx={{ m: 1 }} onClick={handleNext}>
+                Next Day
+              </Button>
+            )}
           </Box>
         </Container>
       </>
