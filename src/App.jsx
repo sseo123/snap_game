@@ -6,37 +6,106 @@ import * as React from "react";
 import StockCard from "./StockCard";
 import InitialPage from "./InitialPage";
 import GameOverPage from "./GameOverPage";
+import RulesPage from "./RulesPage";
 
 const funds = [
-  { code: "125497", name: "HDFC 100", risk: "HIGH" },
-  { code: "120166", name: "SBI Technologys", risk: "HIGH" },
-  { code: "119777", name: "Axis Midcap", risk: "HIGH" },
-  { code: "119565", name: "SBI Gold", risk: "MEDIUM" },
-  { code: "149257", name: "ICICI Silver", risk: "MEDIUM" },
-  { code: "103734", name: "Quantum Liquid Bond", risk: "LOW" },
+  { code: "125497", name: "stock 1", risk: "HIGH" },
+  { code: "100080", name: "stock 2", risk: "HIGH" },
+  { code: "100177", name: "stock 3", risk: "HIGH" },
+  { code: "120827", name: "stock 4", risk: "MEDIUM" },
+  { code: "119731", name: "stock 5", risk: "MEDIUM" },
+  { code: "118968", name: "stock 6", risk: "LOW" },
 ];
 
-const dates = [
-  { start: "2023-01-01", end: "2023-01-28" },
-  { start: "2023-01-28", end: "2023-03-28" },
-  { start: "2023-03-28", end: "2023-05-26" },
-  { start: "2023-05-26", end: "2023-06-28" },
-  { start: "2023-06-28", end: "2023-08-28" },
-];
+const NUM_ROUNDS = 5;
+
+const fetchHistoryForPeriod = (startDate, endDate) => {
+  return Promise.all(
+    funds.map((fund) =>
+      fetch(
+        `https://api.mfapi.in/mf/${fund.code}?startDate=${startDate}&endDate=${endDate}`,
+      )
+        .then((res) => {
+          if (!res.ok) throw new Error(`Error fetching ${fund.code}`);
+          return res.json();
+        })
+        .then((data) => ({ ...fund, history: data.data })),
+    ),
+  );
+};
+
+function parseMfapiDate(dateStr) {
+  const [day, month, year] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function findClosestEntry(history, targetDateStr) {
+  const target = new Date(targetDateStr);
+  let closest = null;
+  let closestDiff = Infinity;
+
+  for (const entry of history) {
+    const diff = Math.abs(parseMfapiDate(entry.date) - target);
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closest = entry;
+    }
+  }
+  return closest;
+}
+
+function buildRounds(period) {
+  const startYear = parseInt(period.startDate.split("-")[0], 10);
+  let rounds = [];
+
+  for (let i = 0; i < NUM_ROUNDS; i++) {
+    rounds.push({
+      targetStartDate: `${startYear + i}-06-01`,
+      targetEndDate: `${startYear + i + 1}-08-01`,
+    });
+  }
+
+  return rounds;
+}
 
 function App() {
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [rules, setRules] = useState(false);
 
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [fundHistories, setFundHistories] = useState(null);
+  const [rounds, setRounds] = useState([]);
   const [stocks, setStocks] = useState([]);
+  const [currentRoundDates, setCurrentRoundDates] = useState(null); // actual matched dates for display
   const [amount, setAmount] = useState({});
   const [buyOrSellMap, setBuyOrSellMap] = useState({});
-  const [portfolio, setPortfolio] = useState({ cash: 100000, holdings: {} });
+  const [portfolio, setPortfolio] = useState({ cash: 100000 });
 
   const [dateIndex, setDateIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [shareAmount, setShareAmount] = useState(0);
+  const [lastPayouts, setLastPayouts] = useState({}); // code -> payout, for showing results after reveal
+
+  const handleRestart = () => {
+    setStarted(false);
+    setGameOver(false);
+    setRules(false);
+
+    setSelectedPeriod(null);
+    setFundHistories(null);
+    setRounds([]);
+    setStocks([]);
+    setCurrentRoundDates(null);
+    setAmount({});
+    setBuyOrSellMap({});
+    setPortfolio({ cash: 100000 });
+
+    setDateIndex(0);
+    setLoading(false);
+    setRevealed(false);
+    setLastPayouts({});
+  };
 
   const handleAmountChange = (code, value) => {
     setAmount((prev) => ({ ...prev, [code]: value }));
@@ -46,103 +115,126 @@ function App() {
     setBuyOrSellMap((prev) => ({ ...prev, [code]: value }));
   };
 
+  const handleRules = (period) => {
+    setSelectedPeriod(period);
+    setRules(true);
+  };
+
+  const handleStart = (period) => {
+    setStarted(true);
+  };
+
   const handleReveal = () => {
-    setRevealed(true);
-    let newPortfolio = { ...portfolio, holdings: { ...portfolio.holdings } };
+    let remainingCash = portfolio.cash;
+    const payouts = {};
+    let breakoutEarly = false;
+    let totalInvestedAmount = 0;
+
+    stocks.forEach((stock) => {
+      const investAmount = parseFloat(amount[stock.code]);
+
+      if (investAmount) {
+        totalInvestedAmount += investAmount;
+      }
+
+      if (totalInvestedAmount > portfolio.cash) {
+        console.log("Not enough cash");
+        breakoutEarly = true;
+        return;
+      }
+    });
+
+    if (breakoutEarly) {
+      return;
+    }
 
     stocks.forEach((stock) => {
       const investAmount = parseFloat(amount[stock.code]);
       const action = buyOrSellMap[stock.code] || "Buy";
-      const price = parseFloat(stock.initial);
+      const initialPrice = parseFloat(stock.initial);
+      const eventualPrice = parseFloat(stock.eventual);
 
       if (!investAmount || investAmount <= 0) {
         return;
       }
 
-      const currShares = newPortfolio.holdings[stock.code] || 0;
+      const priceRatio = eventualPrice / initialPrice;
 
-      if (action === "Buy") {
-        if (investAmount <= newPortfolio.cash) {
-          newPortfolio.cash -= investAmount;
-          newPortfolio.holdings[stock.code] = currShares + investAmount / price;
-        } else {
-          console.log(`Not enough cash for ${stock.name}`);
-        }
-      } else {
-        const sharesToSell = investAmount / price;
-        if (sharesToSell <= currShares) {
-          newPortfolio.cash += investAmount;
-          newPortfolio.holdings[stock.code] = currShares - sharesToSell;
-        } else {
-          console.log(`Not enough shares of ${stock.name} to sell`);
-        }
-      }
+      const payout =
+        action === "Buy"
+          ? investAmount * priceRatio
+          : Math.max(0, investAmount * (2 - priceRatio));
+
+      remainingCash = remainingCash - investAmount + payout;
+      payouts[stock.code] = payout;
     });
 
-    setPortfolio(newPortfolio);
-    setAmount({});
+    setRevealed(true);
+    setPortfolio({ cash: remainingCash });
+    setLastPayouts(payouts);
   };
 
   const handleNext = () => {
-    if (dateIndex < dates.length - 1) {
+    if (dateIndex < rounds.length - 1) {
       setDateIndex(dateIndex + 1);
     } else {
       setGameOver(true);
     }
 
     setRevealed(false);
-  };
-
-  // api call to get stocks
-  const fetchStocks = (start, end) => {
-    return Promise.all(
-      funds.map((fund) =>
-        fetch(
-          `https://api.mfapi.in/mf/${fund.code}?startDate=${start}&endDate=${end}`,
-        )
-          .then((res) => {
-            if (!res.ok) throw new Error(`Error fetching ${fund.code}`);
-            return res.json();
-          })
-          .then((data) => {
-            const priceData = data.data;
-            const start_price = priceData[priceData.length - 1].nav;
-            const end_price = priceData[0].nav;
-            console.log(start_price, end_price);
-            setLoading(false);
-            return { ...fund, initial: start_price, eventual: end_price };
-          }),
-      ),
-    );
+    setLastPayouts({});
+    setAmount({});
   };
 
   useEffect(() => {
+    if (!selectedPeriod) return;
+
     setLoading(true);
-    const { start, end } = dates[dateIndex];
-    fetchStocks(start, end)
-      .then((results) => setStocks(results))
+    fetchHistoryForPeriod(selectedPeriod.startDate, selectedPeriod.endDate)
+      .then((histories) => {
+        console.log(histories);
+        setFundHistories(histories);
+        setRounds(buildRounds(selectedPeriod));
+      })
       .catch((error) => console.error(error));
-  }, [dateIndex]);
+  }, [selectedPeriod]);
 
-  const calculateNetWorth = () => {
-    let sum = 0;
+  useEffect(() => {
+    if (!fundHistories || rounds.length === 0) return;
 
-    for (let i = 0; i < stocks.length; i++) {
-      let sharesOwned = portfolio.holdings[stocks[i].code] || 0;
-      let currentPrice = revealed
-        ? parseFloat(stocks[i].eventual) || 0
-        : parseFloat(stocks[i].initial) || 0;
-      sum += sharesOwned * currentPrice;
-    }
+    const round = rounds[dateIndex];
+    let matchedStartDate = null;
+    let matchedEndDate = null;
 
-    return portfolio.cash + sum;
-  };
+    const roundStocks = fundHistories.map((fund) => {
+      const startEntry = findClosestEntry(fund.history, round.targetStartDate);
+      const endEntry = findClosestEntry(fund.history, round.targetEndDate);
+
+      if (startEntry) {
+        matchedStartDate = startEntry.date;
+      }
+      if (endEntry) {
+        matchedEndDate = endEntry.date;
+      }
+
+      return {
+        code: fund.code,
+        name: fund.name,
+        risk: fund.risk,
+        initial: startEntry?.nav,
+        eventual: endEntry?.nav,
+      };
+    });
+
+    setStocks(roundStocks);
+    setCurrentRoundDates({ start: matchedStartDate, end: matchedEndDate });
+    setLoading(false);
+  }, [fundHistories, rounds, dateIndex]);
 
   if (gameOver) {
-    const finalNetWorth = calculateNetWorth();
-    return <GameOverPage finalNetWorth={finalNetWorth} />;
+    const total = portfolio.cash;
+    return <GameOverPage total={total} restart={handleRestart} />;
   } else if (started) {
-    // when the game starts page
     return (
       <>
         <Container maxWidth="lg">
@@ -167,22 +259,24 @@ function App() {
             </Box>{" "}
             Game
           </Typography>
+
+          {currentRoundDates && (
+            <Typography
+              align="center"
+              variant="subtitle1"
+              color="text.secondary"
+            >
+              Round {dateIndex + 1} of {rounds.length}:{" "}
+              {currentRoundDates.start} &rarr; {currentRoundDates.end}
+            </Typography>
+          )}
+
           <Typography align="center" variant="h5">
-            Cash: $
+            Spendable Money: $
             {portfolio.cash.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
-          </Typography>
-
-          <Typography align="center" variant="h5">
-            Net Worth: $
-            {!loading
-              ? calculateNetWorth().toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })
-              : "Calculating . . ."}
           </Typography>
 
           <Grid container spacing={2}>
@@ -196,14 +290,14 @@ function App() {
                 onBuyOrSellChange={handleBuyOrSellChange}
                 uLoading={loading}
                 revealed={revealed}
-                sharesOwned={portfolio.holdings[stock.code]}
+                payout={lastPayouts[stock.code]}
               />
             ))}
           </Grid>
 
           <Box align="center">
             {!revealed ? (
-              <Button sx={{ m: 1 }} onClick={handleReveal}>
+              <Button sx={{ m: 1 }} onClick={handleReveal} disabled={loading}>
                 Submit Stock Selection
               </Button>
             ) : (
@@ -215,8 +309,10 @@ function App() {
         </Container>
       </>
     );
+  } else if (rules) {
+    return <RulesPage onStart={handleStart} />;
   } else {
-    return <InitialPage onStart={() => setStarted(true)} />;
+    return <InitialPage onStart={handleRules} />;
   }
 }
 

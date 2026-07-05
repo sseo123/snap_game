@@ -1,6 +1,28 @@
-import { Container, Typography, Box, Button } from "@mui/material";
+import { useState } from "react";
+import {
+  Container,
+  Typography,
+  Box,
+  Button,
+  ToggleButtonGroup,
+  ToggleButton,
+} from "@mui/material";
+
+const time_periods = [
+  { label: "2013 - 2018", startDate: "2013-01-01", endDate: "2018-01-01" },
+  { label: "2015 - 2020", startDate: "2015-01-01", endDate: "2020-01-01" },
+  { label: "2018 - 2023", startDate: "2018-01-01", endDate: "2023-01-01" },
+];
 
 function InitialPage({ onStart }) {
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+
+  const handlePeriodChange = (e, value) => {
+    if (value) {
+      setSelectedPeriod(value);
+    }
+  };
+
   return (
     <>
       <Container maxWidth="lg">
@@ -25,8 +47,34 @@ function InitialPage({ onStart }) {
           </Box>{" "}
           skills
         </Typography>
+
+        <Typography align="center" variant="h6" sx={{ mt: 4, mb: 1 }}>
+          Pick a time period to jump into
+        </Typography>
+
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+          <ToggleButtonGroup
+            color="primary"
+            value={selectedPeriod}
+            exclusive
+            onChange={handlePeriodChange}
+            aria-label="time period"
+          >
+            {time_periods.map((period) => (
+              <ToggleButton key={period.label} value={period}>
+                {period.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
+
         <Box sx={{ display: "flex", justifyContent: "center" }}>
-          <Button variant="contained" size="large" onClick={onStart}>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={!selectedPeriod}
+            onClick={() => onStart(selectedPeriod)}
+          >
             Get Started
           </Button>
         </Box>
