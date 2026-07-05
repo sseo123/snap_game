@@ -1,6 +1,7 @@
 import { Container, Typography, Box, Button, Grid } from "@mui/material";
 import { CardContent, Card, ToggleButton } from "@mui/material";
 import { ToggleButtonGroup, TextField } from "@mui/material";
+import { useState } from "react";
 
 function RulesPage({ onStart }) {
   return (
@@ -37,13 +38,7 @@ function RulesPage({ onStart }) {
             <li>Good luck!</li>
           </ul>
         </Typography>
-        <Box>
-          <TextField
-            id="standard-basic"
-            label="Name (first and last)"
-            variant="standard"
-          />
-        </Box>
+
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Button variant="contained" size="large" onClick={onStart}>
             Get Started

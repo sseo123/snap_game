@@ -68,6 +68,24 @@ function buildRounds(period) {
   return rounds;
 }
 
+function insertScore(leaderboard, name, score) {
+  const newEntry = { name, score };
+  const res = [];
+  let inserted = false;
+
+  for (let i = 0; i < leaderboard.length; i++) {
+    if (!inserted && score >= leaderboard[i].score) {
+      res.push(newEntry);
+      inserted = true;
+    }
+    res.push(leaderboard[i]);
+  }
+  if (!inserted) {
+    res.push(newEntry);
+  }
+  return res;
+}
+
 function App() {
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -86,6 +104,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [lastPayouts, setLastPayouts] = useState({}); // code -> payout, for showing results after reveal
+
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [playerName, setPlayerName] = useState("");
 
   const handleRestart = () => {
     setStarted(false);
@@ -115,9 +136,10 @@ function App() {
     setBuyOrSellMap((prev) => ({ ...prev, [code]: value }));
   };
 
-  const handleRules = (period) => {
+  const handleRules = (period, name) => {
     setSelectedPeriod(period);
     setRules(true);
+    setPlayerName(name);
   };
 
   const handleStart = (period) => {
@@ -178,6 +200,7 @@ function App() {
     if (dateIndex < rounds.length - 1) {
       setDateIndex(dateIndex + 1);
     } else {
+      setLeaderboard((prev) => insertScore(prev, playerName, portfolio.cash));
       setGameOver(true);
     }
 
@@ -233,7 +256,13 @@ function App() {
 
   if (gameOver) {
     const total = portfolio.cash;
-    return <GameOverPage total={total} restart={handleRestart} />;
+    return (
+      <GameOverPage
+        total={total}
+        restart={handleRestart}
+        leaderboard={leaderboard}
+      />
+    );
   } else if (started) {
     return (
       <>
@@ -312,7 +341,7 @@ function App() {
   } else if (rules) {
     return <RulesPage onStart={handleStart} />;
   } else {
-    return <InitialPage onStart={handleRules} />;
+    return <InitialPage onStart={handleRules} leaderboard={leaderboard} />;
   }
 }
 

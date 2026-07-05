@@ -6,6 +6,10 @@ import {
   Button,
   ToggleButtonGroup,
   ToggleButton,
+  Grid,
+  styled,
+  Paper,
+  TextField,
 } from "@mui/material";
 
 const time_periods = [
@@ -14,8 +18,20 @@ const time_periods = [
   { label: "2018 - 2023", startDate: "2018-01-01", endDate: "2023-01-01" },
 ];
 
-function InitialPage({ onStart }) {
+const Item = styled(Paper)(({ theme }) => ({
+  backgroundColor: "#fff",
+  ...theme.typography.body2,
+  padding: theme.spacing(1),
+  textAlign: "center",
+  color: (theme.vars ?? theme).palette.text.secondary,
+  ...theme.applyStyles("dark", {
+    backgroundColor: "#1A2027",
+  }),
+}));
+
+function InitialPage({ onStart, leaderboard }) {
   const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [name, setName] = useState("");
 
   const handlePeriodChange = (e, value) => {
     if (value) {
@@ -48,6 +64,15 @@ function InitialPage({ onStart }) {
           skills
         </Typography>
 
+        <Box>
+          <TextField
+            id="standard-basic"
+            label="Name (first and last)"
+            variant="standard"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Box>
         <Typography align="center" variant="h6" sx={{ mt: 4, mb: 1 }}>
           Pick a time period to jump into
         </Typography>
@@ -72,11 +97,23 @@ function InitialPage({ onStart }) {
           <Button
             variant="contained"
             size="large"
-            disabled={!selectedPeriod}
-            onClick={() => onStart(selectedPeriod)}
+            disabled={!selectedPeriod || !name}
+            onClick={() => onStart(selectedPeriod, name)}
           >
             Get Started
           </Button>
+        </Box>
+
+        <Box sx={{ maxWidth: 400, mx: "auto" }}>
+          {leaderboard.map((entry, i) => (
+            <Typography key={i} align="center">
+              {i + 1}. {entry.name} — $
+              {entry.score.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Typography>
+          ))}
         </Box>
       </Container>
     </>
