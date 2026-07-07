@@ -521,12 +521,12 @@ const theme = createTheme({
 // ─── Game constants ───────────────────────────────────────────────────────────
 
 const funds = [
-  { code: "125497", name: "Apex Growth", risk: "HIGH" },
-  { code: "100080", name: "Frontier Capital", risk: "HIGH" },
-  { code: "100177", name: "Summit Ventures", risk: "HIGH" },
-  { code: "120827", name: "Horizon Balanced", risk: "HIGH" },
-  { code: "119731", name: "Meridian Select", risk: "HIGH" },
-  { code: "118968", name: "Anchor Stable", risk: "HIGH" },
+  { code: "125497", name: "Industrial Startup Mutual Fund", risk: "HIGH" },
+  { code: "100080", name: "Financial Bank Equities", risk: "HIGH" },
+  { code: "100177", name: "Energy & Power Index Fund", risk: "HIGH" },
+  { code: "120827", name: "Healthcare & Manufacturing Fund", risk: "HIGH" },
+  { code: "119731", name: "E-Commerce Fund", risk: "HIGH" },
+  { code: "118968", name: "Computational Fund", risk: "HIGH" },
 ];
 
 const NUM_ROUNDS = 5;

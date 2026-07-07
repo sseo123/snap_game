@@ -39,6 +39,7 @@
 // }
 
 // export default GameOverPage;
+
 import { Container, Typography, Box, Button, Stack } from "@mui/material";
 import { Trophy, RotateCcw, TrendingUp, TrendingDown } from "lucide-react";
 

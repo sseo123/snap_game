@@ -165,7 +165,7 @@ function RulesPage({ onStart }) {
             endIcon={<ChevronRight size={16} />}
             sx={{ py: 1.4, px: 5 }}
           >
-            {"I'm Ready And Going To Win"}
+            {"Click to Start Game"}
           </Button>
         </Box>
       </Container>

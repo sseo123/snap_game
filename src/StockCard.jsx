@@ -127,6 +127,7 @@
 // }
 
 // export default StockCard;
+
 import { Card, CardContent, Typography, Box, TextField, ToggleButtonGroup, ToggleButton, Chip, Divider, } from "@mui/material";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
@@ -345,7 +346,7 @@ function StockCard({ stock, amount, buyOrSell, onAmountChange, onBuyOrSellChange
                   variant="overline"
                   sx={{ color: "#8B8FA8", fontSize: "0.55rem" }}
                 >
-                  Cost Basis
+                  Spending 
                 </Typography>
                 <Typography
                   sx={{
